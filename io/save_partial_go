@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"io"
 	"image"
+	"image/draw"
 	"image/color"
 	"image/png"
 	"math/cmplx"
@@ -21,18 +22,24 @@ func main() {
 	t := time.Now().Nanosecond()
 	rand.Seed(int64(t))
 
-	fp,err := os.Create("./test.png")
-	if err !=nil {
-		fmt.Printf("File creation error\n")
-		return
+	filename := [4]string {"0.png","1.png","2.png", "3.png"}
+
+	var fps  [4]os.File
+	
+	for i:=0;i<4;i++ {
+		fp,err := os.Create(filename[i])
+		if err !=nil {
+			fmt.Printf("File creation error\n")
+			return
+		}
+		fps[i] = *fp
 	}
 
-	buf := new(bytes.Buffer)
-	w := io.Writer(buf)
 
 	var imgs  [4]image.RGBA
 	for i:=0;i<4;i++ {
 		imgs[i] = *image.NewRGBA(image.Rect(0, 0, width, height))
+		draw.Draw(&imgs[i], imgs[i].Bounds(), image.Transparent, image.ZP, draw.Src)
 	}
 
 	//img := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -46,14 +53,16 @@ func main() {
 			imgs[rand.Intn(4)].Set(px, py, mandelbrot(z))
 		}
 	}
-	png.Encode(w, &imgs[0]) // NOTE: ignoring errors
-	
-	//write to file
-	fp.Write(buf.Bytes())
+
+	for i:=0;i<4;i++ {
+		buf := new(bytes.Buffer)
+		png.Encode(io.Writer(buf), &imgs[i]) // NOTE: ignoring errors
+		fps[i].Write(buf.Bytes()) //write to file
+		fps[i].Close()
+	}
 
 
 	fmt.Println("goodbye")
-	fp.Close()
 }
 
 func mandelbrot(z complex128) color.Color {
