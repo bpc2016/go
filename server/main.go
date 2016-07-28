@@ -14,6 +14,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	//"image/draw"
 	"math"
 	"math/cmplx"
 	"io"
@@ -61,6 +62,11 @@ func mandelb(w io.Writer, n int) {
 	iterations := n*600
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	// we want a transparent background ..
+	// see blog.golang.org/goimagedraw-package
+	//white := color.RGBA{255, 255, 255, 0}
+	//draw.Draw(img, img.Bounds(), &image.Uniform{white}, image.ZP, draw.Src)
+	//main loop
 	for py := 0; py < height; py++ {
 		//y := float64(py)/height*(ymax-ymin) + ymin
 		y := y0 + float64(py)/height*side
