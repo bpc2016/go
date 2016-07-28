@@ -1,0 +1,19 @@
+package main
+
+import (
+	//"fmt"
+	"log"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", handler) // each request calls handler
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	//fmt.Fprintf(w, "URL.Path = %q\n", r.URL.Path)
+	w.Write([]byte("<html><title>Mandelbrot</title><body>Superimposed Mandelbrot<div style=\"position:relative\"><div style=\"position:absolute;left:0;top:0;\"><img src=\"http://localhost:8000/1.png\" width=1024 height=1024/></div></div></body></html>"))
+}
+
+//!-
