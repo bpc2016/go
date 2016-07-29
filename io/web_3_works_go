@@ -1,0 +1,17 @@
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", handler) // each request calls handler
+	http.Handle("/images/",http.StripPrefix("/images/", http.FileServer(http.Dir(".")) ) ) 
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("<html><title>Mandelbrot</title><style>.im0{position:absolute; top:0; left:0; z-index:1}.im1{position:absolute; top:0; left:0; z-index:3}.im2{position:absolute; top:0; left:0; z-index:5}.im3{position:absolute; top:0; left:0; z-index:7}</style><body>Superimposed Mandelbrot<div style=\"position:relative\"><img src=\"http://localhost:8000/images/0.png\" width=1024 height=1024 class=\"im0\" /><img src=\"http://localhost:8000/images/1.png\" width=1024 height=1024 class=\"im1\" /><img src=\"http://localhost:8000/images/2.png\" width=1024 height=1024 class=\"im2\" /><img src=\"http://localhost:8000/images/3.png\" width=1024 height=1024 class=\"im3\" /></div></body></html>"))
+
+}

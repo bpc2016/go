@@ -1,0 +1,3 @@
+combine js in page (deliver it via an index,html - use the filserver)
+together with 'different' uris - so / then /0, .. /3 with /i spitting out 
+i+1/4 or more of the png: save these to temps ...
