@@ -1,0 +1,28 @@
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", handler) // each request calls handler
+	http.Handle("/static/",
+		http.StripPrefix("/static/", http.FileServer(http.Dir(".")) ) ) 
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+func handler(w http.ResponseWriter, r *http.Request) { // note the use of backtick!!
+	w.Write([]byte(`
+<html>
+<head>
+<title>Mandelbrot</title>
+<link rel="stylesheet" href="static/overlay.css">
+<script type="text/javascript" src="static/jquery-1.9.1.min.js"></script>
+<script type="text/javascript" src="static/mandelbrot.js"></script>
+</head>
+<body><h2>Superimposed Mandelbrot</h2>
+<div id="imgs" style="position:relative">
+</div>
+</body>
+</html>`))}
