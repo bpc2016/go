@@ -1,0 +1,41 @@
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+const(N = 20)
+
+func main(){
+	v := randPermutation()	
+	show(v) // show it
+}
+
+func randPermutation() [N] int {
+	t := time.Now().Nanosecond()
+	rand.Seed(int64(t))
+	
+	var v [N]int
+	for i,_ := range v{
+		v[i] = i // we will start from 0, of course
+	}
+	for i:=0; i<N-1; i++{
+		j := rand.Intn(N-i)+ i
+		swap(&v,i,j)
+	}
+	return v
+}
+
+func swap(v *[N]int, a int, b int){
+	h := v[b]
+	v[b] = v[a]
+	v[a] = h
+}
+
+func show(v [20]int){
+	for _,b := range v{
+		fmt.Print(b," ")
+	}
+}

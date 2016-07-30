@@ -1,0 +1,45 @@
+/*
+
+	Implements the Knuth randompermutation algorithm
+
+*/
+
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+const(
+	N = 20
+)
+
+func main(){
+	v := randPermutation()	
+	show(v) // show it
+}
+
+func randPermutation() [N] int {
+	t := time.Now().Nanosecond()
+	rand.Seed(int64(t))
+	
+	var v [N]int
+	for i,_ := range v{
+		v[i] = i // we will start from 0, of course
+	}
+	for i:=0; i<N-1; i++{
+		j := rand.Intn(N-i)+ i
+		//swap v_i,v_j
+		h := v[j];v[j] = v[i]; v[i] = h
+	}
+	return v
+}
+
+
+func show(v [N]int){
+	for _,b := range v{
+		fmt.Print(b," ")
+	}
+}
