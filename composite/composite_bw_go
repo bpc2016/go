@@ -1,0 +1,149 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	//"fmt"
+	"bytes"
+	"io"
+	"image"
+	"image/draw"
+	"image/color"
+	"image/png"
+	"math/cmplx"
+	"time"
+	"math/rand"
+	"encoding/base64"
+)
+
+func main() {
+	http.HandleFunc("/", handler_init) // each request calls handler
+	http.HandleFunc("/image", handler_image) // each request calls handler
+	http.Handle("/static/",
+		http.StripPrefix("/static/", http.FileServer(http.Dir(".")) ) ) 
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+// display the base html
+func handler_init(w http.ResponseWriter, r *http.Request) {
+	//t := time.Now().Nanosecond()
+	//rand.Seed(int64(t))
+
+	setCoords()
+ 	// note the use of backtick!!
+	w.Write([]byte(`
+<html>
+<head>
+<title>Mandelbrot</title>
+<script type="text/javascript" src="static/jquery-1.9.1.min.js"></script>
+<script type="text/javascript" src="static/mandelbrot.js"></script>
+</head>
+<body><h2>Mandelbrot</h2>
+<div id="imgs" style="position:relative">
+</div>
+</body>
+</html>`))}
+
+// return a mandelbrot image
+func handler_image(w http.ResponseWriter, r *http.Request) {
+	getImage(w) // fetch the base64 encoded png image
+}
+
+const(
+	width,height = 1024, 1024
+	N = 1024*1024 //number of pixels
+)
+
+var (
+	x [N] int
+	y [N] int
+	perm [N] int
+	position = 0
+	rate = 300	// how quickly we process, goes down to 20
+)
+
+func setCoords(){
+	//fill our coordinate arrays
+	k := 0;
+	for iy := 0; iy<height; iy++{
+		for ix := 0; ix<width; ix++{
+			x[k] = ix
+			y[k] = iy
+			k++	
+		}
+	}		
+	perm = randPermutation() // set up the permutation
+	position = 0
+}
+
+func getImage(w io.Writer) {
+	const (
+		//xmin, ymin, xmax, ymax = -2, -2, +2, +2
+		xmin, ymin, xmax, ymax = -0.75, 0.21, -0.71, 0.25
+	)
+
+	if position == N {  // we are done, send this indicator to js
+		io.WriteString(w,"0")
+		return 
+	}
+	lim := position + 1024*rate
+	if rate > 20 { rate = rate - 70; if rate < 20 {rate = 20} }
+	if lim > N { lim=N }
+
+	var (
+		px,py,r_k int	//pixel positions
+		rx,ry float64	//real, im parts
+		z complex128
+	)
+
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	draw.Draw(img, img.Bounds(), image.Transparent, image.ZP, draw.Src)
+
+	buf := new(bytes.Buffer)
+	for k := position; k<lim; k++{ // N
+		r_k = perm[k]	// randomize
+		px = x[r_k]; py = y[r_k]
+		rx = float64(px)/width*(xmax-xmin) + xmin
+		ry = float64(py)/height*(ymax-ymin) + ymin
+		z = complex(rx, ry)
+		// Image point (px, py) represents complex value z.
+		img.Set(px, py, mandelbrot(z))
+		position = k+1;
+	}
+
+	png.Encode(io.Writer(buf), img) // NOTE: ignoring errors, to an io.Writer
+
+	// convert to base64
+	encoder := base64.NewEncoder(base64.StdEncoding, w) // send to target w
+	encoder.Write(buf.Bytes())
+	encoder.Close()
+}
+
+func mandelbrot(z complex128) color.Color {
+	const iterations = 210
+	const contrast = 15
+
+	var v complex128
+	for n := uint8(0); n < iterations; n++ {
+		v = v*v + z
+		if cmplx.Abs(v) > 2 {
+			return color.Gray{255 - contrast*n}
+		}
+	}
+	return color.Black
+}
+
+func randPermutation() [N] int {
+	t := time.Now().Nanosecond()
+	rand.Seed(int64(t))
+	
+	var v [N]int
+	for i,_ := range v{
+		v[i] = i // we will start from 0, of course
+	}
+	for i:=0; i<N-1; i++{
+		j := rand.Intn(N-i)+ i	// now i <= j <= N-1
+		h := v[j];v[j] = v[i]; v[i] = h //swap v_i,v_j
+	}
+	return v
+}
