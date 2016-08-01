@@ -1,15 +1,8 @@
 /*
-	localhost:8000
+	localhost:8000[/?num=2&r=64]
 	generates a *color* 1024x1024 mandelbrot progressively
-	modify 
-	refresh rate (r), 
-	iterations (num), 
-	square size (w), 
-	number of goroutines (m),
-	color distribution (col) 
-	- you may wish to set r to a power of 2
-   // http://localhost:8000/?x=-0.727650183203125&y=0.2136008193359375&w=0.0000003375&num=160&r=64&m=7&col=1.2
-  //http://localhost:8000/?x=-0.7221093749999999&y=0.24281250000000001&w=0.02&num=1&r=128&m=4&col=-120 
+	modify rate, iterations
+	- using goroutines, here we have 3
 */
 
 package main
@@ -34,7 +27,7 @@ import (
 
 func main() {
 	http.HandleFunc("/", handler_init) // each request calls handler
-	http.HandleFunc("/image/", handler_image) // each request calls handler
+	http.HandleFunc("/image", handler_image) // each request calls handler
 	http.Handle("/static/",
 		http.StripPrefix("/static/", http.FileServer(http.Dir(".")) ) ) 
 	log.Fatal(http.ListenAndServe("localhost:8000", nil))
@@ -44,7 +37,23 @@ func main() {
 // display the base html
 func handler_init(w http.ResponseWriter, r *http.Request) {
 	setCoords()
-	getPars(r) // handle the querystring
+	if err := r.ParseForm(); err != nil {
+		log.Print(err)
+	}
+	//set up our vars num=iterations
+	for k, v := range r.Form {
+		if k!="num" && k!="r" { continue }
+		fmt.Println("k=",k,"v=",v)
+		n,err := strconv.Atoi(v[0])
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		switch k {
+			case "num": num = n  // global var number of  iterations
+			case "r": rate = n  // global var rate
+		}
+	}
  	// note the use of backtick!!
 	w.Write([]byte(`
 <html>
@@ -53,19 +62,7 @@ func handler_init(w http.ResponseWriter, r *http.Request) {
 <script type="text/javascript" src="static/jquery-1.9.1.min.js"></script>
 <script type="text/javascript" src="static/mandelbrot.js"></script>
 </head>
-<body>
-<form>
-x: <input type="text" size=8 name="x">
-y: <input type="text" size=8 name="y">
-wd: <input type="text" size=5 name="w">
-itrs: <input type="text" size=3 name="num">
-refr: <input type="text" size=3 name="r">
-grs: <input type="text" size=3 name="m">
-clr: <input type="text" size=3 name="col">
-&nbsp;
-<input type="submit" value="Submit">
-</form>
-<p>
+<body><h2>Mandelbrot</h2>
 <div id="imgs" style="position:relative">
 </div>
 </body>
@@ -73,13 +70,13 @@ clr: <input type="text" size=3 name="col">
 
 // return a mandelbrot image
 func handler_image(w http.ResponseWriter, r *http.Request) {
-	getPars(r) // handle the querystring
 	getImage(w) // fetch the base64 encoded png image
 }
 
 const(
 	width,height = 1024, 1024
-	N = 1024*1024 	// number of pixels
+	N = 1024*1024 //number of pixels
+	x0, y0, side = -0.75, 0.21, 0.04
 )
 
 var (
@@ -88,17 +85,7 @@ var (
 	perm [N] int
 	position = 0
 	rate = 128  // how quickly we process - default if we dont  ?r=345 etc
-	num = 1     // multiples of 600
-	Mod = 4     // number of concurrent go routines
-	cx, cy, rad = -0.73, 0.23, 0.02 // x0=cx-rad, y0=cy-rad
-	col = 1256.0  // color
-	options = map[string] int {
-		"m":1,"r":1,"num":1,	// 1 = int, 2 = float
-		"x":2,"y":2,"w":2,
-		"dpx":1,"dpy":1,
-		"in":1,"out":1,
-		"col":2,
-	}
+	num = 1    // multiples of 600
 )
 
 func setCoords(){
@@ -115,82 +102,15 @@ func setCoords(){
 	position = 0
 }
 
-
-func getPars(r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		log.Print(err)
-	}
-
-	//set up our vars num=iterations
-	for k, v := range r.Form {
-		if options[k]==0 { continue }
-		var (
-			n int 
-			z float64
-			err error
-		)
-		if  options[k]==1 { // int value
-			n,err = strconv.Atoi(v[0])
-			if err != nil {
-				log.Print(err)
-				continue
-			}
-		} else {
-			z,err = strconv.ParseFloat(v[0],64)
-			if err != nil {
-				log.Print(err)
-				continue
-			}
-		}
-		switch k {
-			case "num": num = n  // global var number of  iterations
-			case "r": rate = n  // global var rate
-			case "m": Mod = n   // global var Mod - number of goroutines
-			case "x": cx= z     // global var center x coord
-			case "y": cy= z     // global var center y coord
-			case "w": rad= z    // global var half a side
-			case "dpx": 
-				if position==0 {
-					cx = cx+rad*float64(n-512)/float64(512)
-					fmt.Println("new cx = ", cx)
-				}
-			case "dpy": 
-				if position==0 {
-					cy = cy+rad*float64(512-n)/float64(512) 
-					fmt.Println("new cy = ", cy)
-				}
- 			case "in":
- 				if position==0 { 
- 					rad = rad*3/4 
- 					fmt.Println("new rad = ", rad)
- 				}
- 			case "out":
- 				if position==0 { 
- 					rad = 2*rad 
- 					fmt.Println("new rad = ", rad)
- 				}
-			case "col": col = z  // change the hue 
-		}
-	}
-}
-
 func getImage(w io.Writer) {
-	if position == N {  // complete we are done, send this indicator to js
-		sx := strconv.FormatFloat(cx,'f',-1,64)
-		sy := strconv.FormatFloat(cy,'f',-1,64)
-		sr := strconv.FormatFloat(rad,'f',-1,64)
-		si := strconv.Itoa(num)
-		st := strconv.Itoa(rate)
-		sm := strconv.Itoa(Mod)
-		sc := strconv.FormatFloat(col,'f',-1,64)
-		io.WriteString(w,"_"+sx+"_"+sy+"_"+sr+"_"+si+"_"+st+"_"+sm+"_"+sc)
-		position = 0
+	if position == N {  // we are done, send this indicator to js
+		io.WriteString(w,"0")
 		return 
 	}
 	if rate==0 {rate=256}
 	lim := position + 1024*rate
+	//if rate > 40 { rate = rate - 40 }
 fmt.Print("Rate = ",rate,", position = ",position,"\n")
-//fmt.Print("cx = ",cx,", cy = ",cy,", rad = ",rad,"\n")
 	if lim > N { lim=N }
 
 	buf := new(bytes.Buffer)
@@ -198,18 +118,15 @@ fmt.Print("Rate = ",rate,", position = ",position,"\n")
 
 	img0 := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	for i:=0; i<Mod; i++ {
-		go partialImage(lim,Mod,i,c)
-	}
+	go partialImage(lim,3,0,c)
+	go partialImage(lim,3,1,c)
+	go partialImage(lim,3,2,c)
 
-	count := 0
-	op := draw.Src
-	for img := range c {
-		draw.Draw(img0, img0.Bounds(), img, image.ZP, op)
-		if op==draw.Src { op=draw.Over } // swicth the one time
-		count++
-		if count==Mod { close(c) }
-	}
+	img1, img2, img3 := <-c, <-c, <-c
+
+	draw.Draw(img0, img0.Bounds(), img1, image.ZP, draw.Src) // 
+	draw.Draw(img0, img0.Bounds(), img2, image.ZP, draw.Over) // the rest are so
+	draw.Draw(img0, img0.Bounds(), img3, image.ZP, draw.Over) // 
 
 	png.Encode(io.Writer(buf), img0) // NOTE: ignoring errors, to an io.Writer
 	position = lim	// update
@@ -227,11 +144,8 @@ func partialImage(lim int, base int, part int, c chan image.Image) {
 	var (
 		px,py,r_k int	//pixel positions
 		rx,ry float64	//real, im parts
-		x0, y0, side float64 // -0.75, 0.21, 0.04
 		z complex128
 	)
-
-	x0=cx-rad; y0=cy-rad; side=2*rad
 
 	for k:=position; k<lim; k++ { 
 		if k%base != part { continue } // choose our residue class
@@ -263,11 +177,9 @@ func mandelbrot(z complex128) color.Color {
 	return color.Black
 }
 
-
-
 func coloRatio(z, max int) uint64{
 	const T = 8355771 //codeColors([3]int{127,127,127})
-	var B = col 
+	const B	 = float64(1256) 
 	x := float64(z)/float64(max)
 	y := (1 - B*x - (1-B*float64(max))*x*x)*float64(T)
 	return uint64(math.Floor(y))
